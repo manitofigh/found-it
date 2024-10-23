@@ -13,7 +13,7 @@ const MOCK_ITEMS = [
         title: 'MacBook Pro',
         description: 'Found in the library, second floor near the study rooms.',
         category: 'electronics',
-        location: 'University Library',
+        location: 'Axinn Library',
         date: new Date(),
         status: 'found',
         userId: '1',
