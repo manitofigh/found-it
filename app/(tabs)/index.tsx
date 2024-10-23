@@ -6,7 +6,7 @@ import SearchBar from '../../components/common/SearchBar';
 import ItemCard from '../../components/cards/ItemCard';
 import { Colors } from '../../constants/Colors';
 
-// Temporary mock data
+// temp mock data
 const MOCK_ITEMS = [
     {
         id: '1',
