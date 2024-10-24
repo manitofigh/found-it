@@ -81,7 +81,7 @@ export const MOCK_ITEMS = [
     title: 'Umbrella (Blue with Stripes)',
     description: 'Left by the bike racks near the dorms.',
     category: 'other',
-    location: 'Dormitories (Bike Racks)',
+    location: 'Stuyvesant dorms (Bike Racks)',
     date: new Date(Date.now() - 3456000000000), // about 109 years ago...
     status: 'found',
     userId: '8',
