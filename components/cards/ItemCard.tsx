@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Link } from 'expo-router';
 import { format } from 'date-fns';
 import StatusBadge from '../common/StatusBadge';
@@ -23,26 +23,20 @@ export default function ItemCard({ item }: ItemCardProps) {
                                 {item.title}
                             </Text>
                             <Text className="text-sm text-gray-500 mt-1">
-                                {format(item.date, 'MMM d, yyyy')} • {item.location}
+                                {format(new Date(item.date), 'MMM d, yyyy')} • {item.location}
                             </Text>
                         </View>
                         <StatusBadge status={item.status} />
                     </View>
                     
-                    {item.images && item.images.length > 0 && (
-                        <Image
-                            source={{ uri: item.images[0] }}
-                            className="w-full h-48 rounded-lg mt-3"
-                            resizeMode="cover"
-                        />
+                    {item.description && (
+                        <Text 
+                            className="text-gray-600 mt-2"
+                            numberOfLines={2}
+                        >
+                            {item.description}
+                        </Text>
                     )}
-                    
-                    <Text 
-                        className="text-gray-600 mt-2"
-                        numberOfLines={2}
-                    >
-                        {item.description}
-                    </Text>
                 </View>
             </TouchableOpacity>
         </Link>

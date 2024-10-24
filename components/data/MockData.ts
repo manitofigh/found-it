@@ -110,3 +110,36 @@ export const MOCK_ITEMS = [
     isAnonymous: true,
     },
 ] as const; // to be read only
+
+export const MOCK_MESSAGES = [
+  {
+    id: '1',
+    sender: 'Diddy',
+    lastMessage: 'That\'s my laptop, where did you find it',
+    timestamp: new Date('2023-05-15T10:30:00'),
+    unread: true,
+  },
+  {
+    id: '2',
+    sender: 'Hmmm',
+    lastMessage: 'PSafe says they never received that item?',
+    timestamp: new Date('2023-05-14T15:45:00'),
+    unread: false,
+  },
+  {
+    id: '3',
+    sender: 'Mike Tyson',
+    lastMessage: 'Come here',
+    timestamp: new Date('2023-05-13T09:20:00'),
+    unread: true,
+  },
+] as const;
+
+export const MOCK_USER = {
+  id: '1',
+  name: 'Mani Tofigh',
+  email: 'mtofigh1@pride.hofstra.edu',
+  rewardPoints: 150,
+  itemsPosted: 5,
+  itemsReturned: 3,
+} as const;

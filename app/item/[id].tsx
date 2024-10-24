@@ -1,44 +1,80 @@
-import React from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { 
-    MapPinIcon, 
-    CalendarIcon, 
-    ChatBubbleLeftRightIcon 
-} from 'react-native-heroicons/outline';
+    View, 
+    Text, 
+    ScrollView, 
+    ActivityIndicator,
+    Platform 
+} from 'react-native';
+import { Image } from 'expo-image';  // Use expo-image instead of react-native Image
+import { useLocalSearchParams } from 'expo-router';
 import { format } from 'date-fns';
+import { MapPinIcon, CalendarIcon } from 'react-native-heroicons/outline';
 import StatusBadge from '../../components/common/StatusBadge';
 import { Colors } from '../../constants/Colors';
-
-const MOCK_ITEM = {
-    id: '1',
-    title: 'MacBook Pro',
-    description: 'Found in the hammer lab.',
-    category: 'electronics',
-    location: 'Hammer Lab',
-    date: new Date(),
-    status: 'found',
-    images: ['https://i.imgflip.com/97qlnm.jpg'],
-    userId: '1',
-    isAnonymous: false,
-    user: {
-        name: 'Diddy',
-        rewardPoints: 120
-    }
-} as const;
+import { itemsService } from '../../services/itemsService';
+import { Item } from '../../types';
 
 export default function ItemDetail() {
     const { id } = useLocalSearchParams();
-    const item = MOCK_ITEM; // In real app, fetch item by id
+    const [item, setItem] = useState<Item | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [imageLoading, setImageLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchItem = async () => {
+            try {
+                const data = await itemsService.getItemById(id as string);
+                console.log('Fetched item data:', data);
+                setItem(data);
+            } catch (error) {
+                console.error('Error fetching item:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchItem();
+    }, [id]);
+
+    if (isLoading) {
+        return (
+            <View className="flex-1 items-center justify-center">
+                <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
+            </View>
+        );
+    }
+
+    if (!item) {
+        return (
+            <View className="flex-1 items-center justify-center">
+                <Text className="text-gray-500">Item not found</Text>
+            </View>
+        );
+    }
 
     return (
         <ScrollView className="flex-1 bg-gray-50">
-            {item.images && item.images.length > 0 && (
-                <Image
-                    source={{ uri: item.images[0] }}
-                    className="w-full h-64"
-                    resizeMode="cover"
-                />
+            {item.images && item.images.length > 0 ? (
+                <View className="w-full h-64 bg-gray-100">
+                    {imageLoading && (
+                        <View className="absolute inset-0 items-center justify-center">
+                            <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
+                        </View>
+                    )}
+                    <Image
+                        source={item.images[0]}
+                        style={{ width: '100%', height: '100%' }}
+                        contentFit="cover"
+                        transition={200}
+                        onLoadStart={() => setImageLoading(true)}
+                        onLoadEnd={() => setImageLoading(false)}
+                    />
+                </View>
+            ) : (
+                <View className="w-full h-64 bg-gray-200 items-center justify-center">
+                    <Text className="text-gray-500">No image available</Text>
+                </View>
             )}
 
             <View className="p-4">
@@ -46,7 +82,7 @@ export default function ItemDetail() {
                     <Text className="text-2xl font-bold text-gray-900 flex-1">
                         {item.title}
                     </Text>
-                    <StatusBadge status={item.status as any} />
+                    <StatusBadge status={item.status} />
                 </View>
 
                 <View className="mt-4 space-y-2">
@@ -57,7 +93,7 @@ export default function ItemDetail() {
                     <View className="flex-row items-center">
                         <CalendarIcon size={20} color={Colors.text.secondary} strokeWidth={2} />
                         <Text className="ml-2 text-gray-600">
-                            {format(item.date, 'MMM d, yyyy')}
+                            {format(new Date(item.date), 'MMM d, yyyy')}
                         </Text>
                     </View>
                 </View>
@@ -66,27 +102,6 @@ export default function ItemDetail() {
                     <Text className="text-lg font-semibold mb-2">Description</Text>
                     <Text className="text-gray-600 leading-6">{item.description}</Text>
                 </View>
-
-                {!item.isAnonymous && (
-                    <View className="mt-6 bg-white p-4 rounded-lg">
-                        <Text className="text-lg font-semibold mb-2">Posted by</Text>
-                        <View className="flex-row justify-between items-center">
-                            <View>
-                                <Text className="text-gray-900">{item.user.name}</Text>
-                                <Text className="text-gray-500">
-                                    {item.user.rewardPoints} reward points
-                                </Text>
-                            </View>
-                            <TouchableOpacity 
-                                className="bg-primary px-4 py-2 rounded-lg flex-row items-center"
-                                onPress={() => {/* Implement messaging later */}}
-                            >
-                                <ChatBubbleLeftRightIcon size={20} color="white" strokeWidth={2} />
-                                <Text className="text-white ml-2">Message</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
             </View>
         </ScrollView>
     );
