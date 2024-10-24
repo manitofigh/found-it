@@ -31,7 +31,7 @@ const FilterChip = ({ label, isSelected, onPress }: FilterChipProps) => {
     React.useEffect(() => {
         Animated.timing(animatedValue, {
             toValue: isSelected ? 1 : 0,
-            duration: 200,
+            duration: 25,
             useNativeDriver: false,
         }).start();
     }, [isSelected]);
