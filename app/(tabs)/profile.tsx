@@ -5,7 +5,8 @@ import {
     StarIcon,
     ChatBubbleLeftRightIcon,
     BellIcon,
-    Cog6ToothIcon 
+    Cog6ToothIcon,
+    ArrowLeftStartOnRectangleIcon,
 } from 'react-native-heroicons/outline';
 import { Colors } from '../../constants/Colors';
 
@@ -36,7 +37,7 @@ export default function Profile() {
     return (
         <ScrollView className="flex-1 bg-gray-50">
             <View className="bg-primary p-6 items-center">
-                <UserCircleIcon size={80} color={Colors.secondary.DEFAULT} strokeWidth={2} />
+                <UserCircleIcon size={80} color="#4b5563" strokeWidth={2} />
                 <Text className="mt-4 text-xl font-bold text-blue-700">{MOCK_USER.name}</Text>
                 <Text className="text-blue-700 opacity-80">{MOCK_USER.email}</Text>
                 
@@ -75,6 +76,11 @@ export default function Profile() {
                 <ProfileOption 
                     icon={Cog6ToothIcon}
                     title="Settings"
+                    onPress={() => {/* laterrrr */}}
+                />
+                <ProfileOption 
+                    icon={ArrowLeftStartOnRectangleIcon}
+                    title="Logout"
                     onPress={() => {/* laterrrr */}}
                 />
             </View>
