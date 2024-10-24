@@ -1,73 +1,69 @@
-import React, { useState, useMemo } from 'react';
-import { View, ScrollView, Text, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, Text, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { Link } from 'expo-router';
 import { PlusIcon } from 'react-native-heroicons/outline';
 import SearchBar from '../../components/common/SearchBar';
 import InlineFilters from '../../components/common/InlineFilters';
 import ItemCard from '../../components/cards/ItemCard';
-import { MOCK_ITEMS } from '../../components/data/MockData';
+import { itemsService } from '../../services/itemsService';
+import { useItemsStore, useFilteredItems } from '../../stores/itemsStore';
+import { Colors } from '../../constants/Colors';
 
 export default function Home() {
-    const [searchQuery, setSearchQuery] = useState('');
     const [showFilters, setShowFilters] = useState(false);
-    const [filters, setFilters] = useState({
-        category: '',
-        sortBy: 'newest',
-        status: 'all'
-    });
+    const { setItems, filters, setFilters } = useItemsStore();
+    const filteredItems = useFilteredItems();
+    const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // Filter and sort the items
-    const filteredItems = useMemo(() => {
-        let items = [...MOCK_ITEMS];
-
-        // Apply status filter
-        if (filters.status !== 'all') {
-            items = items.filter(item => item.status === filters.status);
+    const fetchItems = async (showLoadingState = true) => {
+        try {
+            if (showLoadingState) setIsLoading(true);
+            console.log('Fetching items with filters:', filters);
+            const data = await itemsService.getItems(0, filters);
+            console.log('Fetched data:', data);
+            setItems(data);
+        } catch (error) {
+            console.error('Failed to fetch items:', error);
+        } finally {
+            setIsLoading(false);
         }
+    };
 
-        // Apply category filter
-        if (filters.category) {
-            items = items.filter(item => item.category === filters.category);
-        }
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await fetchItems(false);
+        setIsRefreshing(false);
+    };
 
-        // Apply sorting
-        items = items.sort((a, b) => {
-            if (filters.sortBy === 'newest') {
-                return b.date.getTime() - a.date.getTime();
-            } else {
-                return a.date.getTime() - b.date.getTime();
-            }
+    useEffect(() => {
+        fetchItems();
+
+        // Subscribe to real-time updates
+        const unsubscribe = itemsService.subscribeToItems((newItem) => {
+            setItems(prev => [newItem, ...prev]);
         });
 
-        return items;
+        return () => {
+            unsubscribe();
+        };
     }, [filters]);
-
-    const handleSearch = (text: string) => {
-        setSearchQuery(text);
-    };
-
-    const handleFilterPress = () => {
-        setShowFilters(!showFilters);
-    };
 
     return (
         <View className="flex-1 bg-gray-50">
-            <SearchBar onSearch={handleSearch} onFilterPress={handleFilterPress} />
+            <SearchBar
+                onSearch={(text) => setFilters({ search: text })}
+                onFilterPress={() => setShowFilters(!showFilters)}
+            />
             
             <InlineFilters
                 visible={showFilters}
                 selectedCategory={filters.category}
                 selectedSort={filters.sortBy}
                 selectedStatus={filters.status}
-                onSelectCategory={(category) => 
-                    setFilters(prev => ({ ...prev, category }))
-                }
-                onSelectSort={(sortBy) => 
-                    setFilters(prev => ({ ...prev, sortBy }))
-                }
-                onSelectStatus={(status) => 
-                    setFilters(prev => ({ ...prev, status }))
-                }
+                onSelectCategory={(category) => setFilters({ category })}
+                onSelectSort={(sortBy) => setFilters({ sortBy })}
+                onSelectStatus={(status) => setFilters({ status })}
                 pageType="home"
             />
 
@@ -95,13 +91,33 @@ export default function Home() {
                 </Link>
             </View>
 
-            <ScrollView className="flex-1">
+            <ScrollView 
+                className="flex-1"
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={handleRefresh}
+                        tintColor={Colors.primary.DEFAULT}
+                    />
+                }
+            >
                 <Text className="px-4 py-2 text-lg font-semibold text-gray-900">
-                    Recent Items ({filteredItems.length})
+                    Recent Items {filteredItems.length > 0 && `(${filteredItems.length})`}
                 </Text>
-                {filteredItems.map((item) => (
-                    <ItemCard key={item.id} item={item} />
-                ))}
+                
+                {isLoading ? (
+                    <View className="flex-1 items-center justify-center py-8">
+                        <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
+                    </View>
+                ) : filteredItems.length === 0 ? (
+                    <View className="flex-1 items-center justify-center py-8">
+                        <Text className="text-gray-500">No items found</Text>
+                    </View>
+                ) : (
+                    filteredItems.map((item) => (
+                        <ItemCard key={item.id} item={item} />
+                    ))
+                )}
             </ScrollView>
         </View>
     );
