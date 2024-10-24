@@ -1,5 +1,3 @@
-console.log("SUPABASE URL: " + process.env.SUPABASE_URL);
-
 export default {
   expo: {
     name: "found-it",
