@@ -1,6 +1,6 @@
 # FoundIt
 
-Find and/or return items on your university's campus.
+Find <and|or> return items on your university's campus.
 
 ## Get started
 
