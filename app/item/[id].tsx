@@ -10,20 +10,19 @@ import { format } from 'date-fns';
 import StatusBadge from '../../components/common/StatusBadge';
 import { Colors } from '../../constants/Colors';
 
-// Mock item data - in real app, fetch based on ID
 const MOCK_ITEM = {
     id: '1',
     title: 'MacBook Pro',
-    description: 'Space Gray MacBook Pro 13" found in the library second floor near the study rooms. It was left unattended for several hours. Currently being held at the library lost and found desk.',
+    description: 'Found in the hammer lab.',
     category: 'electronics',
-    location: 'Axinn Library - Second Floor',
+    location: 'Hammer Lab',
     date: new Date(),
     status: 'found',
-    images: ['https://placeholder.com/350x250'],
+    images: ['https://i.imgflip.com/97qlnm.jpg'],
     userId: '1',
     isAnonymous: false,
     user: {
-        name: 'Jane Smith',
+        name: 'Diddy',
         rewardPoints: 120
     }
 } as const;

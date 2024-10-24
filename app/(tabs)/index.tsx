@@ -1,52 +1,42 @@
 import React from 'react';
+import { useState } from 'react';
 import { View, ScrollView, Text, TouchableOpacity } from 'react-native';
 import { Link } from 'expo-router';
 import { PlusIcon } from 'react-native-heroicons/outline';
 import SearchBar from '../../components/common/SearchBar';
 import ItemCard from '../../components/cards/ItemCard';
-import { Colors } from '../../constants/Colors';
-
-// temp mock data
-const MOCK_ITEMS = [
-    {
-        id: '1',
-        title: 'MacBook Pro',
-        description: 'Found in the library, second floor near the study rooms.',
-        category: 'electronics',
-        location: 'Axinn Library',
-        date: new Date(),
-        status: 'found',
-        userId: '1',
-        isAnonymous: false
-    },
-    {
-        id: '2',
-        title: 'Student ID Card',
-        description: 'Lost somewhere between the cafeteria and science building.',
-        category: 'documents',
-        location: 'Science Building',
-        date: new Date(Date.now() - 86400000), // Yesterday
-        status: 'lost',
-        userId: '2',
-        isAnonymous: false
-    },
-] as const;
+import FilterModal from '../../components/common/FilterModal';
+import { MOCK_ITEMS } from '../../components/data/MockData';
 
 export default function Home() {
+
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+    const [filters, setFilters] = useState({
+        category: '',
+        sortBy: 'newest' as const,
+        status: 'all' as const
+    });
+
     const handleSearch = (text: string) => {
-        // Will implement later with backend
-        console.log('Searching:', text);
+        setSearchQuery(text);
     };
 
     const handleFilterPress = () => {
-        // Will implement filter modal later
-        console.log('Filter pressed');
+        setIsFilterModalVisible(true);
     };
+
+    const handleApplyFilters = (newFilters: typeof filters) => {
+        setFilters(newFilters);
+        // Will implement filter logic later
+        console.log('Applied filters:', newFilters);
+    };
+
 
     return (
         <View className="flex-1 bg-gray-50">
             <SearchBar onSearch={handleSearch} onFilterPress={handleFilterPress} />
-            
+
             <View className="flex-row justify-between px-4 py-3">
                 <Link href="/create/lost" asChild>
                     <TouchableOpacity 
@@ -58,7 +48,7 @@ export default function Home() {
                         </Text>
                     </TouchableOpacity>
                 </Link>
-                
+
                 <Link href="/create/found" asChild>
                     <TouchableOpacity 
                         className="flex-1 ml-2 bg-green-500 rounded-lg py-3 flex-row justify-center items-center"
@@ -79,6 +69,13 @@ export default function Home() {
                     <ItemCard key={item.id} item={item} />
                 ))}
             </ScrollView>
+
+            <FilterModal
+                isVisible={isFilterModalVisible}
+                onClose={() => setIsFilterModalVisible(false)}
+                filters={filters}
+                onApplyFilters={handleApplyFilters}
+            />
         </View>
     );
 }
