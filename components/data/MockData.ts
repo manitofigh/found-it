@@ -2,7 +2,7 @@ export const MOCK_ITEMS = [
   {
     id: '1',
     title: 'Black Laptop Bag',
-    description: 'Lost near the Engineering building. Contains no showering material 🛁🧼🚿🧽🧴.',
+    description: 'Lost at the Engineering building. Contains no showering material 🛁🧼🚿🧽🧴.',
     category: 'accessories',
     location: 'Engineering Building',
     date: new Date(),
