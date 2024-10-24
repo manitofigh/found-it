@@ -1,59 +1,93 @@
-import React from 'react';
-import { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, ScrollView, Text, TouchableOpacity } from 'react-native';
 import { Link } from 'expo-router';
 import { PlusIcon } from 'react-native-heroicons/outline';
 import SearchBar from '../../components/common/SearchBar';
+import InlineFilters from '../../components/common/InlineFilters';
 import ItemCard from '../../components/cards/ItemCard';
-import FilterModal from '../../components/common/FilterModal';
 import { MOCK_ITEMS } from '../../components/data/MockData';
 
 export default function Home() {
-
     const [searchQuery, setSearchQuery] = useState('');
-    const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+    const [showFilters, setShowFilters] = useState(false);
     const [filters, setFilters] = useState({
         category: '',
-        sortBy: 'newest' as const,
-        status: 'all' as const
+        sortBy: 'newest',
+        status: 'all'
     });
+
+    // Filter and sort the items
+    const filteredItems = useMemo(() => {
+        let items = [...MOCK_ITEMS];
+
+        // Apply status filter
+        if (filters.status !== 'all') {
+            items = items.filter(item => item.status === filters.status);
+        }
+
+        // Apply category filter
+        if (filters.category) {
+            items = items.filter(item => item.category === filters.category);
+        }
+
+        // Apply sorting
+        items = items.sort((a, b) => {
+            if (filters.sortBy === 'newest') {
+                return b.date.getTime() - a.date.getTime();
+            } else {
+                return a.date.getTime() - b.date.getTime();
+            }
+        });
+
+        return items;
+    }, [filters]);
 
     const handleSearch = (text: string) => {
         setSearchQuery(text);
     };
 
     const handleFilterPress = () => {
-        setIsFilterModalVisible(true);
+        setShowFilters(!showFilters);
     };
-
-    const handleApplyFilters = (newFilters: typeof filters) => {
-        setFilters(newFilters);
-        // Will implement filter logic later
-        console.log('Applied filters:', newFilters);
-    };
-
 
     return (
         <View className="flex-1 bg-gray-50">
             <SearchBar onSearch={handleSearch} onFilterPress={handleFilterPress} />
+            
+            <InlineFilters
+                visible={showFilters}
+                selectedCategory={filters.category}
+                selectedSort={filters.sortBy}
+                selectedStatus={filters.status}
+                onSelectCategory={(category) => 
+                    setFilters(prev => ({ ...prev, category }))
+                }
+                onSelectSort={(sortBy) => 
+                    setFilters(prev => ({ ...prev, sortBy }))
+                }
+                onSelectStatus={(status) => 
+                    setFilters(prev => ({ ...prev, status }))
+                }
+                pageType="home"
+            />
 
             <View className="flex-row justify-between px-4 py-3">
                 <Link href="/create/lost" asChild>
                     <TouchableOpacity 
                         className="flex-1 mr-2 bg-red-500 rounded-lg py-3 flex-row justify-center items-center"
                     >
-                        <PlusIcon size={20} color="white" />
+                        <PlusIcon size={20} color="white" strokeWidth={2} />
                         <Text className="text-white font-semibold ml-2">
                             Report Lost
                         </Text>
                     </TouchableOpacity>
                 </Link>
-
+                
                 <Link href="/create/found" asChild>
                     <TouchableOpacity 
                         className="flex-1 ml-2 bg-green-500 rounded-lg py-3 flex-row justify-center items-center"
                     >
-                        <PlusIcon size={20} color="white" />
+                        <PlusIcon size={20} color="white" strokeWidth={2} />
                         <Text className="text-white font-semibold ml-2">
                             Report Found
                         </Text>
@@ -63,19 +97,12 @@ export default function Home() {
 
             <ScrollView className="flex-1">
                 <Text className="px-4 py-2 text-lg font-semibold text-gray-900">
-                    Recent Items
+                    Recent Items ({filteredItems.length})
                 </Text>
-                {MOCK_ITEMS.map((item) => (
+                {filteredItems.map((item) => (
                     <ItemCard key={item.id} item={item} />
                 ))}
             </ScrollView>
-
-            <FilterModal
-                isVisible={isFilterModalVisible}
-                onClose={() => setIsFilterModalVisible(false)}
-                filters={filters}
-                onApplyFilters={handleApplyFilters}
-            />
         </View>
     );
 }

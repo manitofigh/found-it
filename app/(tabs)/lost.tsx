@@ -1,53 +1,63 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, ScrollView, Text, TouchableOpacity } from 'react-native';
 import { Link } from 'expo-router';
 import { PlusIcon } from 'react-native-heroicons/outline';
 import SearchBar from '../../components/common/SearchBar';
+import InlineFilters from '../../components/common/InlineFilters';
 import ItemCard from '../../components/cards/ItemCard';
-import { Colors } from '../../constants/Colors';
-
-// Temporary mock data for lost items
-const MOCK_LOST_ITEMS = [
-    {
-        id: '1',
-        title: 'Black Laptop Bag',
-        description: 'Lost near the Engineering building. Contains laptop and notebooks.',
-        category: 'accessories',
-        location: 'Engineering Building',
-        date: new Date(),
-        status: 'lost',
-        userId: '1',
-        isAnonymous: false
-    },
-    {
-        id: '2',
-        title: 'Blue Water Bottle',
-        description: 'Left in Physics Lab 101 during morning class.',
-        category: 'other',
-        location: 'Physics Building',
-        date: new Date(Date.now() - 86400000),
-        status: 'lost',
-        userId: '2',
-        isAnonymous: true
-    },
-] as const;
+import { MOCK_ITEMS } from '../../components/data/MockData';
 
 export default function LostItems() {
     const [searchQuery, setSearchQuery] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
+    const [filters, setFilters] = useState({
+        category: '',
+        sortBy: 'newest',
+    });
+
+    const filteredItems = useMemo(() => {
+        let items = MOCK_ITEMS.filter(item => item.status === 'lost');
+
+        if (filters.category) {
+            items = items.filter(item => item.category === filters.category);
+        }
+
+        items = [...items].sort((a, b) => {
+            if (filters.sortBy === 'newest') {
+                return b.date.getTime() - a.date.getTime();
+            } else {
+                return a.date.getTime() - b.date.getTime();
+            }
+        });
+
+        return items;
+    }, [filters]);
 
     const handleSearch = (text: string) => {
         setSearchQuery(text);
-        // Will implement search functionality later
     };
 
     const handleFilterPress = () => {
-        // Will implement filter modal later
+        setShowFilters(!showFilters);
     };
 
     return (
         <View className="flex-1 bg-gray-50">
             <SearchBar onSearch={handleSearch} onFilterPress={handleFilterPress} />
             
+            <InlineFilters
+                visible={showFilters}
+                selectedCategory={filters.category}
+                selectedSort={filters.sortBy}
+                onSelectCategory={(category) => 
+                    setFilters(prev => ({ ...prev, category }))
+                }
+                onSelectSort={(sortBy) => 
+                    setFilters(prev => ({ ...prev, sortBy }))
+                }
+                pageType="lost"
+            />
+
             <Link href="/create/lost" asChild>
                 <TouchableOpacity 
                     className="mx-4 mt-3 mb-2 bg-red-500 rounded-lg py-3 flex-row justify-center items-center"
@@ -60,7 +70,10 @@ export default function LostItems() {
             </Link>
 
             <ScrollView className="flex-1">
-                {MOCK_LOST_ITEMS.map((item) => (
+                <Text className="px-4 py-2 text-lg font-semibold text-gray-900">
+                    Lost Items ({filteredItems.length})
+                </Text>
+                {filteredItems.map((item) => (
                     <ItemCard key={item.id} item={item} />
                 ))}
             </ScrollView>

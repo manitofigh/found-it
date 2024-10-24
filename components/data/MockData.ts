@@ -21,7 +21,6 @@ export const MOCK_ITEMS = [
       userId: '2',
       isAnonymous: false
   },
-  // 10 Additional Items (consistent format)
   {
     id: '3',
     title: 'Red Backpack',
@@ -83,7 +82,7 @@ export const MOCK_ITEMS = [
     description: 'Left by the bike racks near the dorms.',
     category: 'other',
     location: 'Dormitories (Bike Racks)',
-    date: new Date(Date.now() - 3456000000), // Four days ago
+    date: new Date(Date.now() - 3456000000000), // about 109 years ago...
     status: 'found',
     userId: '8',
     isAnonymous: true,
