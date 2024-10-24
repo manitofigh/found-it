@@ -150,7 +150,7 @@ export default function CreateFoundItem() {
                     status: 'found',
                     images: imageUrls,
                     date: new Date().toISOString(),
-                    // Remove the user_id field since we haven't implemented auth yet
+                    // user_id field was being problematic as auth wasn't setup 
                     is_anonymous: false
                 }]);
 
