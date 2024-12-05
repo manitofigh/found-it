@@ -1,15 +1,66 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
-import { Link } from 'expo-router';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { Link, router } from 'expo-router';
 import { format } from 'date-fns';
+import { TrashIcon } from 'react-native-heroicons/outline';
 import StatusBadge from '../common/StatusBadge';
 import { Item } from '../../types';
+import { supabase } from '@/lib/supabase';
 
 interface ItemCardProps {
     item: Item;
+    refreshItems?: () => void; // Optional callback to refresh items list
 }
 
-export default function ItemCard({ item }: ItemCardProps) {
+export default function ItemCard({ item, refreshItems }: ItemCardProps) {
+    const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        async function getUserEmail() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setCurrentUserEmail(user.email);
+            }
+        }
+        getUserEmail();
+    }, []);
+
+    const handleDelete = async () => {
+        Alert.alert(
+            'Delete Posting',
+            'Are you sure you want to delete this posting?',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel'
+                },
+                {
+                    text: 'Yes',
+                    onPress: async () => {
+                        try {
+                            const { error } = await supabase
+                                .from('items')
+                                .update({ deleted: true })
+                                .eq('id', item.id);
+
+                            if (error) throw error;
+
+                            if (refreshItems) {
+                                refreshItems();
+                            } else {
+                                // If we're not given a refresh function, navigate back
+                                // router.back();
+                            }
+                        } catch (error) {
+                            console.error('Error deleting item:', error);
+                            Alert.alert('Error', 'Failed to delete the posting');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     return (
         <Link href={`/item/${item.id}`} asChild>
             <TouchableOpacity 
@@ -28,8 +79,26 @@ export default function ItemCard({ item }: ItemCardProps) {
                             <Text className="text-sm text-gray-500 mt-1">
                                 Location: {item.location}
                             </Text>
+                            {item.submitter_name && (
+                                <Text className="text-sm text-gray-500 mt-1">
+                                    Found By: {item.submitter_name}
+                                </Text>
+                            )}
                         </View>
-                        <StatusBadge status={item.status} />
+                        <View className="flex-row items-center">
+                            <StatusBadge status={item.status} />
+                            {currentUserEmail === item.submitter_email && (
+                                <TouchableOpacity 
+                                    onPress={(e) => {
+                                        e.preventDefault(); // Prevent navigation
+                                        handleDelete();
+                                    }}
+                                    className="ml-2"
+                                >
+                                    <TrashIcon size={20} color="#ef4444" strokeWidth={2} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
                     </View>
 
                     {item.description && (

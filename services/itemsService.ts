@@ -58,7 +58,8 @@ export const itemsService = {
             console.log('Fetching items with filters:', filters);
             let query = supabase
             .from('items')
-            .select('*');
+            .select('*')
+            .eq('deleted', false);
 
             // Apply filters
             if (filters?.status && filters.status !== 'all') {
@@ -102,6 +103,7 @@ export const itemsService = {
                 .from('items')
                 .select('*')
                 .eq('id', id)
+                .eq('deleted', false)
                 .single();
 
             if (error) {

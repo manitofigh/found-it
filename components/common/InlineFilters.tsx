@@ -80,7 +80,7 @@ interface InlineFiltersProps {
     selectedSort: string;
     onSelectCategory: (category: string) => void;
     onSelectSort: (sort: string) => void;
-    pageType: 'lost' | 'found'; // Add this to determine which page we're on
+    pageType: 'lost' | 'found';
 }
 
 export default function InlineFilters({

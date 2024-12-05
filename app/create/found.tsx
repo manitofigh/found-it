@@ -193,7 +193,7 @@ export default function CreateFoundItem() {
                     submitter_email: userDetails.email,
                     submitter_name: userDetails.full_name,
                     is_anonymous: false,
-                    deleted: false  // Add this field
+                    deleted: false
                 }]);
 
             if (error) throw error;

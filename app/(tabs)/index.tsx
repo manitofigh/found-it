@@ -115,7 +115,11 @@ export default function Home() {
                     </View>
                 ) : (
                     filteredItems.map((item) => (
-                        <ItemCard key={item.id} item={item} />
+                        <ItemCard 
+                            key={item.id} 
+                            item={item} 
+                            refreshItems={handleRefresh}
+                        />
                     ))
                 )}
             </ScrollView>
