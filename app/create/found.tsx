@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     View, 
     Text, 
@@ -26,17 +26,52 @@ interface FoundItemForm {
     description: string;
     category: string;
     location: string;
+    submitter_email: string;
 }
 
 export default function CreateFoundItem() {
     const [images, setImages] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [userDetails, setUserDetails] = useState<{
+        full_name: string | null;
+        email: string;
+    } | null>(null);
     const { control, handleSubmit, formState: { errors } } = useForm<FoundItemForm>();
+
+    useEffect(() => {
+        const fetchUserDetails = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+
+                if (user) {
+                    const { data: profile, error } = await supabase
+                        .from('profiles')
+                        .select('full_name')
+                        .eq('id', user.id)
+                        .single();
+
+                    if (error) {
+                        console.error('Error fetching profile:', error);
+                        return;
+                    }
+
+                    setUserDetails({
+                        full_name: profile.full_name,
+                        email: user.email
+                    });
+                }
+            } catch (error) {
+                console.error('Error in fetchUserDetails:', error);
+            }
+        };
+
+        fetchUserDetails();
+    }, []);
 
     const pickImage = async (source: 'camera' | 'library') => {
         try {
-            if (images.length >= 3) {
-                Alert.alert('Limit Reached', 'You can only upload up to 3 images');
+            if (images.length > 1) {
+                Alert.alert('Limit Reached', 'You can only upload up to 1 image.');
                 return;
             }
 
@@ -135,6 +170,11 @@ export default function CreateFoundItem() {
     };
 
     const onSubmit = async (data: FoundItemForm) => {
+        if (!userDetails) {
+            Alert.alert('Error', 'Unable to get user details. Please try again.');
+            return;
+        }
+
         try {
             setIsSubmitting(true);
             let imageUrls: string[] = [];
@@ -150,8 +190,10 @@ export default function CreateFoundItem() {
                     status: 'found',
                     images: imageUrls,
                     date: new Date().toISOString(),
-                    // user_id field was being problematic as auth wasn't setup 
-                    is_anonymous: false
+                    submitter_email: userDetails.email,
+                    submitter_name: userDetails.full_name,
+                    is_anonymous: false,
+                    deleted: false  // Add this field
                 }]);
 
             if (error) throw error;
@@ -169,6 +211,7 @@ export default function CreateFoundItem() {
         }
     };
 
+{/*
     const handleSignOut = async () => {
         try {
             const { error } = await supabase.auth.signOut();
@@ -178,6 +221,7 @@ export default function CreateFoundItem() {
             Alert.alert('Error signing out', error.message);
         }
     };
+    */}
 
 
     const showImagePicker = () => {
@@ -306,7 +350,7 @@ export default function CreateFoundItem() {
 
                 {/* Image Upload Section */}
                 <View className="mb-4">
-                    <Text className="text-gray-700 mb-2">Images (max 3)</Text>
+                    <Text className="text-gray-700 mb-2">Images (max 1)</Text>
                     <View className="flex-row flex-wrap">
                         {images.map((uri, index) => (
                             <View key={index} className="mr-2 mb-2">
@@ -322,7 +366,7 @@ export default function CreateFoundItem() {
                                 </TouchableOpacity>
                             </View>
                         ))}
-                        {images.length < 3 && (
+                        {images.length < 1 && (
                             <TouchableOpacity
                                 className="w-20 h-20 bg-gray-100 rounded-lg items-center justify-center"
                                 onPress={showImagePicker}

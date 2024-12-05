@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, RefreshControl } from 'react-native';
 import { router, Link } from 'expo-router';
 import { 
-    UserCircleIcon,
     StarIcon,
     Cog6ToothIcon,
     ArrowRightOnRectangleIcon,
 } from 'react-native-heroicons/outline';
 import { supabase } from '@/lib/supabase';
+import { Colors } from '@/constants/Colors';
 
 const ProfileOption = ({ icon: Icon, title, path }: { 
     icon: any, 
@@ -38,36 +38,51 @@ export default function Component() {
         email: string;
         items_posted: number;
     } | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
 
     const fetchUserDetails = async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            console.log('Auth user:', user); // Debug log
             
             if (user) {
-                const { data: profile, error } = await supabase
+                // Get profile data
+                const { data: profile, error: profileError } = await supabase
                     .from('profiles')
                     .select('*')
                     .eq('id', user.id)
                     .single();
 
-                console.log('Profile data:', profile); // Debug log
-                console.log('Profile error:', error); // Debug log
+                if (profileError) {
+                    console.error('Error fetching profile:', profileError);
+                    return;
+                }
 
-                if (error) {
-                    console.error('Error fetching profile:', error);
+                // Get count of items posted by user
+                const { count: itemsCount, error: itemsError } = await supabase
+                    .from('items')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('submitter_email', user.email);
+
+                if (itemsError) {
+                    console.error('Error counting items:', itemsError);
                     return;
                 }
 
                 setUserDetails({
                     full_name: profile.full_name,
                     email: user.email,
-                    items_posted: profile.items_posted
+                    items_posted: itemsCount || 0
                 });
             }
         } catch (error) {
             console.error('Error in fetchUserDetails:', error);
         }
+    };
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await fetchUserDetails();
+        setRefreshing(false);
     };
 
     useEffect(() => {
@@ -87,11 +102,19 @@ export default function Component() {
     if (!userDetails) return null;
 
     return (
-        <ScrollView className="flex-1 bg-gray-50">
-            <View className="h-1/3 bg-blue-800 rounded-b-[40px] justify-end pb-10">
+        <ScrollView 
+            className="flex-1 bg-gray-50"
+            refreshControl={
+                <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor={Colors.primary.DEFAULT}
+                />
+            }
+        >
+            <View className="pt-24 h-1/3 bg-blue-800 rounded-b-[40px] justify-end pb-20">
                 <View className="items-center">
-                    <UserCircleIcon size={80} color="white" strokeWidth={2} />
-                    <Text className="mt-20 text-2xl font-bold text-white">
+                    <Text className="text-2xl font-bold text-white">
                         {userDetails.full_name}
                     </Text>
                     <Text className="text-blue-100">{userDetails.email}</Text>

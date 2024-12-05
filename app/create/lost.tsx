@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     View, 
     Text, 
@@ -16,7 +16,7 @@ import { router } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
 import { CameraIcon, PhotoIcon, XMarkIcon } from 'react-native-heroicons/outline';
 import * as ImagePicker from 'expo-image-picker';
-import { decode } from 'base-64'; // maybe
+import { decode } from 'base-64';
 import { Categories } from '../../constants/Categories';
 import { Colors } from '../../constants/Colors';
 import { supabase } from '../../lib/supabase';
@@ -31,12 +31,46 @@ interface LostItemForm {
 export default function CreateLostItem() {
     const [images, setImages] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [userDetails, setUserDetails] = useState<{
+        full_name: string | null;
+        email: string;
+    } | null>(null);
     const { control, handleSubmit, formState: { errors } } = useForm<LostItemForm>();
+
+    useEffect(() => {
+        const fetchUserDetails = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                if (user) {
+                    const { data: profile, error } = await supabase
+                        .from('profiles')
+                        .select('full_name')
+                        .eq('id', user.id)
+                        .single();
+
+                    if (error) {
+                        console.error('Error fetching profile:', error);
+                        return;
+                    }
+
+                    setUserDetails({
+                        full_name: profile.full_name,
+                        email: user.email
+                    });
+                }
+            } catch (error) {
+                console.error('Error in fetchUserDetails:', error);
+            }
+        };
+
+        fetchUserDetails();
+    }, []);
 
     const pickImage = async (source: 'camera' | 'library') => {
         try {
-            if (images.length >= 3) {
-                Alert.alert('Limit Reached', 'You can only upload up to 3 images');
+            if (images.length > 1) {
+                Alert.alert('Limit Reached', 'You can only upload up to 1 image');
                 return;
             }
 
@@ -136,6 +170,11 @@ export default function CreateLostItem() {
     };
 
     const onSubmit = async (data: LostItemForm) => {
+        if (!userDetails) {
+            Alert.alert('Error', 'Unable to get user details. Please try again.');
+            return;
+        }
+
         try {
             setIsSubmitting(true);
             let imageUrls: string[] = [];
@@ -151,8 +190,10 @@ export default function CreateLostItem() {
                     status: 'lost',
                     images: imageUrls,
                     date: new Date().toISOString(),
-                    // Remove user_id for now since we don't have auth
-                    is_anonymous: false
+                    submitter_email: userDetails.email,
+                    submitter_name: userDetails.full_name,
+                    is_anonymous: false,
+                    deleted: false
                 }]);
 
             if (error) throw error;
@@ -169,6 +210,7 @@ export default function CreateLostItem() {
             setIsSubmitting(false);
         }
     };
+
     const showImagePicker = () => {
         if (Platform.OS === 'ios') {
             ActionSheetIOS.showActionSheetWithOptions(
@@ -178,7 +220,7 @@ export default function CreateLostItem() {
                 },
                 (buttonIndex) => {
                     if (buttonIndex === 1) pickImage('camera');
-                    else if (buttonIndex === 2) pickImage('library');
+                        else if (buttonIndex === 2) pickImage('library');
                 }
             );
         } else {
@@ -294,8 +336,8 @@ export default function CreateLostItem() {
                 />
 
                 {/* img upload */}
-                                <View className="mb-4">
-                    <Text className="text-gray-700 mb-2">Images (max 3)</Text>
+                <View className="mb-4">
+                    <Text className="text-gray-700 mb-2">Images (max 1)</Text>
                     <View className="flex-row flex-wrap">
                         {images.map((uri, index) => (
                             <View key={index} className="mr-2 mb-2">
@@ -311,7 +353,7 @@ export default function CreateLostItem() {
                                 </TouchableOpacity>
                             </View>
                         ))}
-                        {images.length < 3 && (
+                        {images.length < 1 && (
                             <TouchableOpacity
                                 className="w-20 h-20 bg-gray-100 rounded-lg items-center justify-center"
                                 onPress={showImagePicker}
@@ -333,10 +375,10 @@ export default function CreateLostItem() {
                     {isSubmitting ? (
                         <ActivityIndicator color="white" />
                     ) : (
-                        <Text className="text-white text-center font-semibold text-lg">
-                            Report Lost Item
-                        </Text>
-                    )}
+                            <Text className="text-white text-center font-semibold text-lg">
+                                Report Lost Item
+                            </Text>
+                        )}
                 </TouchableOpacity>
             </View>
         </ScrollView>

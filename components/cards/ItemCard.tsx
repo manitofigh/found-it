@@ -23,18 +23,23 @@ export default function ItemCard({ item }: ItemCardProps) {
                                 {item.title}
                             </Text>
                             <Text className="text-sm text-gray-500 mt-1">
-                                {format(new Date(item.date), 'MMM d, yyyy')} • {item.location}
+                                Date: {format(new Date(item.date), 'MMM d, yyyy • h:mm a')}
+                            </Text>
+                            <Text className="text-sm text-gray-500 mt-1">
+                                Location: {item.location}
                             </Text>
                         </View>
                         <StatusBadge status={item.status} />
                     </View>
-                    
+
                     {item.description && (
                         <Text 
                             className="text-gray-600 mt-2"
                             numberOfLines={2}
                         >
-                            {item.description}
+                            Description: {item.description.length > 15
+                                ? `${item.description.substring(0, 15)}... (Click to see more)` 
+                                : item.description}
                         </Text>
                     )}
                 </View>

@@ -93,7 +93,7 @@ export default function ItemDetail() {
                     <View className="flex-row items-center">
                         <CalendarIcon size={20} color={Colors.text.secondary} strokeWidth={2} />
                         <Text className="ml-2 text-gray-600">
-                            {format(new Date(item.date), 'MMM d, yyyy')}
+                            {format(new Date(item.date), 'MMM d, yyyy • h:mm a')}
                         </Text>
                     </View>
                 </View>
