@@ -169,6 +169,17 @@ export default function CreateFoundItem() {
         }
     };
 
+    const handleSignOut = async () => {
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+            router.replace('/auth/sign-in');
+        } catch (error) {
+            Alert.alert('Error signing out', error.message);
+        }
+    };
+
+
     const showImagePicker = () => {
         if (Platform.OS === 'ios') {
             ActionSheetIOS.showActionSheetWithOptions(
@@ -178,7 +189,7 @@ export default function CreateFoundItem() {
                 },
                 (buttonIndex) => {
                     if (buttonIndex === 1) pickImage('camera');
-                    else if (buttonIndex === 2) pickImage('library');
+                        else if (buttonIndex === 2) pickImage('library');
                 }
             );
         } else {
@@ -315,6 +326,13 @@ export default function CreateFoundItem() {
                             <TouchableOpacity
                                 className="w-20 h-20 bg-gray-100 rounded-lg items-center justify-center"
                                 onPress={showImagePicker}
+                                /*
+                                 * I once broke the profile page which was the only
+                                 * access point to the log out button, so I had to turn 
+                                 * another button into the log out button and this was
+                                 * my random selection. Will let it be for the future.
+                                 */
+                                // onPress={handleSignOut}
                             >
                                 <View className="items-center">
                                     <CameraIcon size={24} color={Colors.text.secondary} strokeWidth={2} />
@@ -322,7 +340,7 @@ export default function CreateFoundItem() {
                                 </View>
                             </TouchableOpacity>
                         )}
-                                            </View>
+                    </View>
                 </View>
 
                 <TouchableOpacity
@@ -333,10 +351,10 @@ export default function CreateFoundItem() {
                     {isSubmitting ? (
                         <ActivityIndicator color="white" />
                     ) : (
-                        <Text className="text-white text-center font-semibold text-lg">
-                            Report Found Item
-                        </Text>
-                    )}
+                            <Text className="text-white text-center font-semibold text-lg">
+                                Report Found Item
+                            </Text>
+                        )}
                 </TouchableOpacity>
             </View>
         </ScrollView>

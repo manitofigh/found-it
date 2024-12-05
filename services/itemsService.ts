@@ -11,21 +11,37 @@ interface PostgresChanges {
 const ITEMS_PER_PAGE = 20;
 
 export const itemsService = {
+
     async createItem(item: Omit<Item, 'id'>) {
         try {
-            console.log('Creating item:', item);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
+
+            // Get user's name from profiles table
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('full_name, items_posted')
+                .eq('id', user.id)
+                .single();
+
             const { data, error } = await supabase
                 .from('items')
-                .insert([item])
+                .insert([{
+                    ...item,
+                    user_id: user.id,
+                    submitter_name: profile.full_name
+                }])
                 .select()
                 .single();
 
-            if (error) {
-                console.error('Error creating item:', error);
-                throw error;
-            }
-            
-            console.log('Created item:', data);
+            if (error) throw error;
+
+            // Increment items_posted count in profiles
+            await supabase
+            .from('profiles')
+            .update({ items_posted: profile.items_posted + 1 })
+            .eq('id', user.id);
+
             return data;
         } catch (error) {
             console.error('Error in createItem:', error);
@@ -41,8 +57,8 @@ export const itemsService = {
         try {
             console.log('Fetching items with filters:', filters);
             let query = supabase
-                .from('items')
-                .select('*');
+            .from('items')
+            .select('*');
 
             // Apply filters
             if (filters?.status && filters.status !== 'all') {
@@ -105,24 +121,24 @@ export const itemsService = {
         try {
             console.log('Setting up real-time subscription');
             const subscription = supabase
-                .channel('public:items')
-                .on(
-                    'postgres_changes',
-                    {
-                        event: 'INSERT',
-                        schema: 'public',
-                        table: 'items'
-                    },
-                    (payload: RealtimePostgresChangesPayload<PostgresChanges>) => {
-                        console.log('Received real-time update:', payload);
-                        if (payload.new) {
-                            callback(payload.new);
-                        }
+            .channel('public:items')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'items'
+                },
+                (payload: RealtimePostgresChangesPayload<PostgresChanges>) => {
+                    console.log('Received real-time update:', payload);
+                    if (payload.new) {
+                        callback(payload.new);
                     }
-                )
-                .subscribe(status => {
-                    console.log('Subscription status:', status);
-                });
+                }
+            )
+            .subscribe(status => {
+                console.log('Subscription status:', status);
+            });
 
             return () => {
                 console.log('Unsubscribing from real-time updates');

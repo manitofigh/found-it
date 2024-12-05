@@ -1,7 +1,23 @@
-import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { Stack, router } from 'expo-router';
 import { Colors } from '../constants/Colors';
+import { supabase } from '../lib/supabase';
 
 export default function RootLayout() {
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (!session) {
+                router.replace('/auth/sign-in');
+            }
+        });
+
+        supabase.auth.onAuthStateChange((_event, session) => {
+            if (!session) {
+                router.replace('/auth/sign-in');
+            }
+        });
+    }, []);
+
     return (
         <Stack
             screenOptions={{
@@ -12,7 +28,12 @@ export default function RootLayout() {
                 headerTitleStyle: {
                     fontWeight: 'bold',
                 },
+                headerBackTitle: 'Back'
             }}>
+            <Stack.Screen 
+                name="auth" 
+                options={{ headerShown: false }} 
+            />
             <Stack.Screen 
                 name="(tabs)" 
                 options={{ headerShown: false }} 

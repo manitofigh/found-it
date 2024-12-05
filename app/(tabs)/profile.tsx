@@ -1,13 +1,13 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { Link } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { router, Link } from 'expo-router';
 import { 
     UserCircleIcon,
     StarIcon,
-    ChatBubbleLeftRightIcon,
     Cog6ToothIcon,
+    ArrowRightOnRectangleIcon,
 } from 'react-native-heroicons/outline';
-import { MOCK_USER } from '@/components/data/MockData';
+import { supabase } from '@/lib/supabase';
 
 const ProfileOption = ({ icon: Icon, title, path }: { 
     icon: any, 
@@ -32,25 +32,76 @@ const ProfileOption = ({ icon: Icon, title, path }: {
     return content;
 };
 
-const StatCard = ({ title, value }: { title: string, value: number }) => (
-    <View className="bg-white bg-opacity-90 rounded-xl p-4 items-center w-[30%]">
-        <Text className="text-xl font-bold text-blue-500">{value}</Text>
-        <Text className="text-gray-600 mt-1">{title}</Text>
-    </View>
-);
-
 export default function Component() {
+    const [userDetails, setUserDetails] = useState<{
+        full_name: string;
+        email: string;
+        items_posted: number;
+    } | null>(null);
+
+    const fetchUserDetails = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            console.log('Auth user:', user); // Debug log
+            
+            if (user) {
+                const { data: profile, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
+
+                console.log('Profile data:', profile); // Debug log
+                console.log('Profile error:', error); // Debug log
+
+                if (error) {
+                    console.error('Error fetching profile:', error);
+                    return;
+                }
+
+                setUserDetails({
+                    full_name: profile.full_name,
+                    email: user.email,
+                    items_posted: profile.items_posted
+                });
+            }
+        } catch (error) {
+            console.error('Error in fetchUserDetails:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchUserDetails();
+    }, []);
+
+    const handleSignOut = async () => {
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+            router.replace('/auth/sign-in');
+        } catch (error) {
+            Alert.alert('Error signing out', error.message);
+        }
+    };
+
+    if (!userDetails) return null;
+
     return (
-        <ScrollView className="flex-1 bg-gray-100">
-            <View className="p-6 pt-12 items-center bg-blue-800">
-                <UserCircleIcon size={80} color="white" strokeWidth={2} />
-                <Text className="mt-4 text-2xl font-bold text-white">{MOCK_USER.name}</Text>
-                <Text className="text-white text-opacity-80">{MOCK_USER.email}</Text>
-                
-                <View className="flex-row justify-between w-full mt-6">
-                    <StatCard title="Points" value={MOCK_USER.rewardPoints} />
-                    <StatCard title="Posted" value={MOCK_USER.itemsPosted} />
-                    <StatCard title="Returned" value={MOCK_USER.itemsReturned} />
+        <ScrollView className="flex-1 bg-gray-50">
+            <View className="h-1/3 bg-blue-800 rounded-b-[40px] justify-end pb-10">
+                <View className="items-center">
+                    <UserCircleIcon size={80} color="white" strokeWidth={2} />
+                    <Text className="mt-20 text-2xl font-bold text-white">
+                        {userDetails.full_name}
+                    </Text>
+                    <Text className="text-blue-100">{userDetails.email}</Text>
+
+                    <View className="bg-white bg-opacity-90 rounded-xl p-4 mt-6 w-32">
+                        <Text className="text-xl font-bold text-blue-500 text-center">
+                            {userDetails.items_posted}
+                        </Text>
+                        <Text className="text-gray-600 text-center">Posted Items</Text>
+                    </View>
                 </View>
             </View>
 
@@ -60,15 +111,18 @@ export default function Component() {
                     title="My Items"
                 />
                 <ProfileOption 
-                    icon={ChatBubbleLeftRightIcon}
-                    title="Messages"
-                    path="/messages"
-                />
-                <ProfileOption 
                     icon={Cog6ToothIcon}
                     title="Settings"
                     path="/settings"
                 />
+
+                <TouchableOpacity 
+                    onPress={handleSignOut}
+                    className="flex-row items-center bg-white p-4 mb-2 rounded-xl shadow-sm mt-8"
+                >
+                    <ArrowRightOnRectangleIcon size={24} color="#ef4444" strokeWidth={2} />
+                    <Text className="ml-4 text-base text-red-500">Sign Out</Text>
+                </TouchableOpacity>
             </View>
         </ScrollView>
     );
