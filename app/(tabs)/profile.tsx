@@ -112,7 +112,7 @@ export default function Component() {
                 />
             }
         >
-            <View className="pt-24 h-1/3 bg-blue-800 rounded-b-[40px] justify-end pb-20">
+            <View className="pt-24 h-1/3 bg-blue-800 rounded-b-[40px] justify-end pb-20 mb-10">
                 <View className="items-center">
                     <Text className="text-2xl font-bold text-white">
                         {userDetails.full_name}
@@ -129,10 +129,12 @@ export default function Component() {
             </View>
 
             <View className="p-4 mt-4">
+                {/*
                 <ProfileOption 
                     icon={StarIcon}
                     title="My Items"
                 />
+                */}
                 <ProfileOption 
                     icon={Cog6ToothIcon}
                     title="Settings"

@@ -47,24 +47,30 @@ export const pickImage = async (options: 'camera' | 'library') => {
     }
 };
 
-export const uploadImage = async (uri: string, folder: string): Promise<string> => {
+export const uploadImage = async (uri, folder) => {
     try {
+        // Read the file as a base64 string
         const base64 = await FileSystem.readAsStringAsync(uri, {
             encoding: FileSystem.EncodingType.Base64,
         });
-        
-        const fileName = `${Date.now()}.jpg`;
+
+        // Decode the base64 string into an ArrayBuffer
+        const fileData = decode(base64);
+
+        // Generate a unique file name
+        const fileName = `${Date.now()}`;
         const filePath = `${folder}/${fileName}`;
-        
+
+        // Upload the file to Supabase Storage
         const { data, error } = await supabase.storage
             .from('item-images')
-            .upload(filePath, decode(base64), {
+            .upload(filePath, fileData, {
                 contentType: 'image/jpeg',
                 cacheControl: '3600',
             });
 
         if (error) throw error;
-        
+
         return data.path;
     } catch (error) {
         console.error('Error uploading image:', error);

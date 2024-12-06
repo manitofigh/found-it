@@ -335,7 +335,7 @@ export default function CreateFoundItem() {
                             <Text className="text-gray-700 mb-2">Description</Text>
                             <TextInput
                                 className="bg-white p-3 rounded-lg border border-gray-200"
-                                placeholder="Describe the item in detail..."
+                                placeholder="Describe where the owner could find this item (e.g. I handed it to office x in department y"
                                 multiline
                                 numberOfLines={4}
                                 onChangeText={onChange}

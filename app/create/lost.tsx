@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    View, 
-    Text, 
-    ScrollView, 
-    TextInput, 
+import {
+    View,
+    Text,
+    ScrollView,
+    TextInput,
     TouchableOpacity,
     Image,
     Alert,
@@ -14,12 +14,13 @@ import {
 import { useForm, Controller } from 'react-hook-form';
 import { router } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
-import { CameraIcon, PhotoIcon, XMarkIcon } from 'react-native-heroicons/outline';
+import { CameraIcon, XMarkIcon } from 'react-native-heroicons/outline';
 import * as ImagePicker from 'expo-image-picker';
-import { decode } from 'base-64';
+import * as FileSystem from 'expo-file-system';
 import { Categories } from '../../constants/Categories';
 import { Colors } from '../../constants/Colors';
 import { supabase } from '../../lib/supabase';
+import { decode } from 'base-64';
 
 interface LostItemForm {
     title: string;
@@ -41,7 +42,7 @@ export default function CreateLostItem() {
         const fetchUserDetails = async () => {
             try {
                 const { data: { user } } = await supabase.auth.getUser();
-                
+
                 if (user) {
                     const { data: profile, error } = await supabase
                         .from('profiles')
@@ -67,100 +68,118 @@ export default function CreateLostItem() {
         fetchUserDetails();
     }, []);
 
+
     const pickImage = async (source: 'camera' | 'library') => {
         try {
-            if (images.length > 1) {
+            if (images.length >= 1) {
                 Alert.alert('Limit Reached', 'You can only upload up to 1 image');
                 return;
             }
 
             let result;
+            const options = {
+                mediaTypes: ImagePicker.MediaType.Images,  // Updated from MediaTypeOptions
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+            };
+
             if (source === 'camera') {
                 const { status } = await ImagePicker.requestCameraPermissionsAsync();
                 if (status !== 'granted') {
                     Alert.alert('Permission needed', 'Please grant camera permissions');
                     return;
                 }
-                result = await ImagePicker.launchCameraAsync({
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: true,
-                    aspect: [4, 3],
-                    quality: 0.8,
-                });
+                result = await ImagePicker.launchCameraAsync(options);
             } else {
                 const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
                 if (status !== 'granted') {
                     Alert.alert('Permission needed', 'Please grant photo library permissions');
                     return;
                 }
-                result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: true,
-                    aspect: [4, 3],
-                    quality: 0.8,
-                });
+                result = await ImagePicker.launchImageLibraryAsync(options);
             }
 
             if (!result.canceled && result.assets[0].uri) {
-                setImages(prev => [...prev, result.assets[0].uri]);
+                const selectedImage = result.assets[0];
+                console.log('Picked image details:', {
+                    uri: selectedImage.uri,
+                    width: selectedImage.width,
+                    height: selectedImage.height,
+                    type: selectedImage.type,
+                    fileSize: selectedImage.fileSize
+                });
+
+                // Check file info immediately
+                const fileInfo = await FileSystem.getInfoAsync(selectedImage.uri);
+                console.log('FileSystem info for picked image:', fileInfo);
+
+                setImages(prev => [...prev, selectedImage.uri]);
             }
         } catch (error) {
-            Alert.alert('Error', 'Failed to pick image');
             console.error('Error picking image:', error);
+            Alert.alert('Error', 'Failed to pick image');
         }
     };
 
     const uploadImages = async (): Promise<string[]> => {
         try {
             const uploadedUrls = await Promise.all(
-                images.map(async (uri, index) => {
-                    // For local files, we need to read them first
-                    const base64 = await fetch(uri).then(response => 
-                        response.blob()
-                    ).then(blob => {
-                            return new Promise((resolve, reject) => {
-                                const reader = new FileReader();
-                                reader.onload = () => {
-                                    resolve(reader.result);
-                                };
-                                reader.onerror = reject;
-                                reader.readAsDataURL(blob);
-                            });
-                        });
+                images.map(async (uri) => {
+                    console.log('Starting upload for uri:', uri);
 
-                    // remove the data URL prefix to get just the base64 string
-                    const base64String = base64.toString().split(',')[1];
+                    // Get and log file info
+                    const fileInfo = await FileSystem.getInfoAsync(uri);
+                    console.log('File info before upload:', fileInfo);
 
-                    // Create file name
-                    const ext = uri.substring(uri.lastIndexOf('.') + 1);
-                    const fileName = `${Date.now()}-${index}.${ext}`;
+                    if (!fileInfo.exists) {
+                        throw new Error('File does not exist');
+                    }
 
-                    console.log('Uploading file:', fileName);
+                    // Try reading the file directly first
+                    try {
+                        const rawFile = await FileSystem.readAsStringAsync(uri);
+                        console.log('Raw file length:', rawFile.length);
+                    } catch (readError) {
+                        console.error('Error reading raw file:', readError);
+                    }
 
+                    // Read as base64
+                    const base64 = await FileSystem.readAsStringAsync(uri, {
+                        encoding: FileSystem.EncodingType.Base64
+                    });
+                    console.log('Base64 string length:', base64.length);
+
+                    // Create the filename
+                    const fileName = `uploads/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
+
+                    // Try uploading the base64 string directly
                     const { data, error } = await supabase.storage
                         .from('items-images')
-                        .upload(fileName, decode(base64String), {
-                            contentType: `image/${ext}`,
-                            cacheControl: '3600',
+                        .upload(fileName, base64, {
+                            contentType: 'image/jpeg',
                             upsert: false
                         });
 
                     if (error) {
-                        console.error('Upload error:', error);
+                        console.error('Supabase upload error:', error);
                         throw error;
                     }
 
+                    console.log('Upload response:', data);
+
                     const { data: { publicUrl } } = supabase.storage
                     .from('items-images')
-                    .getPublicUrl(data.path);
+                    .getPublicUrl(fileName);
 
+                    console.log('Generated public URL:', publicUrl);
                     return publicUrl;
                 })
             );
 
             return uploadedUrls;
         } catch (error) {
-            console.error('Error in uploadImages:', error);
+            console.error('Fatal error in uploadImages:', error);
             throw error;
         }
     };
@@ -177,12 +196,24 @@ export default function CreateLostItem() {
 
         try {
             setIsSubmitting(true);
+            console.log('Starting submission process');
+
             let imageUrls: string[] = [];
 
             if (images.length > 0) {
-                imageUrls = await uploadImages();
+                console.log('Starting image upload process');
+                try {
+                    imageUrls = await uploadImages();
+                    console.log('Image upload completed:', imageUrls);
+                } catch (uploadError) {
+                    console.error('Image upload failed:', uploadError);
+                    Alert.alert('Error', 'Failed to upload images. Please try again.');
+                    setIsSubmitting(false);
+                    return;
+                }
             }
 
+            console.log('Proceeding with item creation');
             const { error } = await supabase
                 .from('items')
                 .insert([{
@@ -196,7 +227,10 @@ export default function CreateLostItem() {
                     deleted: false
                 }]);
 
-            if (error) throw error;
+            if (error) {
+                console.error('Item creation error:', error);
+                throw error;
+            }
 
             Alert.alert(
                 'Success',
@@ -210,7 +244,6 @@ export default function CreateLostItem() {
             setIsSubmitting(false);
         }
     };
-
     const showImagePicker = () => {
         if (Platform.OS === 'ios') {
             ActionSheetIOS.showActionSheetWithOptions(
@@ -322,7 +355,7 @@ export default function CreateLostItem() {
                             <Text className="text-gray-700 mb-2">Description</Text>
                             <TextInput
                                 className="bg-white p-3 rounded-lg border border-gray-200"
-                                placeholder="Describe the item in detail..."
+                                placeholder="Describe where the owner could find this item (e.g. I handed it to office x in department y"
                                 multiline
                                 numberOfLines={4}
                                 onChangeText={onChange}
