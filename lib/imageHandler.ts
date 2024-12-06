@@ -1,79 +1,107 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
-import supabase from './supabase';
+import { decode } from 'base64-arraybuffer';
+import { supabase } from './supabase';
+import { Alert } from 'react-native';
 
-export const pickImage = async (options: 'camera' | 'library') => {
+export type ImageSource = 'camera' | 'library';
+
+export const pickImage = async (source: ImageSource): Promise<string | null> => {
     try {
-        let result;
-        
-        if (options === 'camera') {
-            const permission = await ImagePicker.requestCameraPermissionsAsync();
-            if (!permission.granted) {
-                throw new Error('Camera permission required');
-            }
-            result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [4, 3],
-                quality: 0.8,
-            });
-        } else {
-            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!permission.granted) {
-                throw new Error('Media library permission required');
-            }
-            result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [4, 3],
-                quality: 0.8,
-            });
+        const { status } = source === 'camera'
+            ? await ImagePicker.requestCameraPermissionsAsync()
+            : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (status !== 'granted') {
+            Alert.alert(
+                'Permission Required',
+                `Please grant ${source} permissions to continue`,
+                [{ text: 'OK' }]
+            );
+            return null;
         }
 
-        if (!result.canceled) {
+        const options: ImagePicker.ImagePickerOptions = {
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.8,
+        };
+
+        const result = source === 'camera'
+            ? await ImagePicker.launchCameraAsync(options)
+            : await ImagePicker.launchImageLibraryAsync(options);
+
+        if (!result.canceled && result.assets[0]) {
+            // Verify the original image
+            const originalFileInfo = await FileSystem.getInfoAsync(result.assets[0].uri);
+            console.log('Original file size:', originalFileInfo.size);
+
+            // Compress and resize the image
             const compressed = await ImageManipulator.manipulateAsync(
                 result.assets[0].uri,
                 [{ resize: { width: 1000 } }],
                 { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
             );
-            
+
+            // Verify the compressed image
+            const compressedFileInfo = await FileSystem.getInfoAsync(compressed.uri);
+            console.log('Compressed file size:', compressedFileInfo.size);
+
             return compressed.uri;
         }
+
         return null;
     } catch (error) {
-        console.error('Error picking image:', error);
-        throw error;
+        console.error('Error in pickImage:', error);
+        Alert.alert('Error', 'Failed to pick image. Please try again.');
+        return null;
     }
 };
 
-export const uploadImage = async (uri, folder) => {
+export const uploadImage = async (uri: string): Promise<string> => {
     try {
-        // Read the file as a base64 string
+        // Verify file exists and has content
+        const fileInfo = await FileSystem.getInfoAsync(uri);
+        if (!fileInfo.exists) {
+            throw new Error('File does not exist');
+        }
+        if (fileInfo.size === 0) {
+            throw new Error('File is empty');
+        }
+
+        // Generate unique filename
+        const fileName = `uploads/${Date.now()}-${Math.random().toString(36).substring(2)}.jpg`;
+
+        // Read file as base64
         const base64 = await FileSystem.readAsStringAsync(uri, {
             encoding: FileSystem.EncodingType.Base64,
         });
 
-        // Decode the base64 string into an ArrayBuffer
-        const fileData = decode(base64);
+        // Decode base64 to ArrayBuffer
+        const arrayBuffer = decode(base64);
 
-        // Generate a unique file name
-        const fileName = `${Date.now()}`;
-        const filePath = `${folder}/${fileName}`;
-
-        // Upload the file to Supabase Storage
+        // Upload to Supabase
         const { data, error } = await supabase.storage
-            .from('item-images')
-            .upload(filePath, fileData, {
+            .from('items-images')
+            .upload(fileName, arrayBuffer, {
                 contentType: 'image/jpeg',
-                cacheControl: '3600',
+                upsert: false,
             });
 
-        if (error) throw error;
+        if (error) {
+            throw error;
+        }
 
-        return data.path;
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('items-images')
+            .getPublicUrl(fileName);
+
+        return publicUrl;
     } catch (error) {
-        console.error('Error uploading image:', error);
+        console.error('Error in uploadImage:', error);
         throw error;
     }
 };

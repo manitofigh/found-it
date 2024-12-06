@@ -1,171 +1,97 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    View, 
-    Text, 
-    ScrollView, 
-    TextInput, 
+import {
+    View,
+    Text,
+    ScrollView,
+    TextInput,
     TouchableOpacity,
     Image,
     Alert,
     ActivityIndicator,
     Platform,
-    ActionSheetIOS
+    ActionSheetIOS,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { router } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
-import { CameraIcon, PhotoIcon, XMarkIcon } from 'react-native-heroicons/outline';
-import { decode } from 'base-64';
-import * as ImagePicker from 'expo-image-picker';
+import { CameraIcon, XMarkIcon } from 'react-native-heroicons/outline';
 import { Categories } from '../../constants/Categories';
 import { Colors } from '../../constants/Colors';
 import { supabase } from '../../lib/supabase';
+import { pickImage, uploadImage } from '../../lib/imageHandler';
 
 interface FoundItemForm {
     title: string;
     description: string;
     category: string;
     location: string;
-    submitter_email: string;
+}
+
+interface UserDetails {
+    full_name: string | null;
+    email: string;
 }
 
 export default function CreateFoundItem() {
     const [images, setImages] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [userDetails, setUserDetails] = useState<{
-        full_name: string | null;
-        email: string;
-    } | null>(null);
-    const { control, handleSubmit, formState: { errors } } = useForm<FoundItemForm>();
+    const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
+    
+    const { 
+        control, 
+        handleSubmit, 
+        formState: { errors } 
+    } = useForm<FoundItemForm>();
 
     useEffect(() => {
-        const fetchUserDetails = async () => {
-            try {
-                const { data: { user } } = await supabase.auth.getUser();
-
-                if (user) {
-                    const { data: profile, error } = await supabase
-                        .from('profiles')
-                        .select('full_name')
-                        .eq('id', user.id)
-                        .single();
-
-                    if (error) {
-                        console.error('Error fetching profile:', error);
-                        return;
-                    }
-
-                    setUserDetails({
-                        full_name: profile.full_name,
-                        email: user.email
-                    });
-                }
-            } catch (error) {
-                console.error('Error in fetchUserDetails:', error);
-            }
-        };
-
         fetchUserDetails();
     }, []);
 
-    const pickImage = async (source: 'camera' | 'library') => {
+    const fetchUserDetails = async () => {
         try {
-            if (images.length > 1) {
-                Alert.alert('Limit Reached', 'You can only upload up to 1 image.');
-                return;
-            }
+            const { data: { user } } = await supabase.auth.getUser();
 
-            let result;
-            if (source === 'camera') {
-                const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                if (status !== 'granted') {
-                    Alert.alert('Permission needed', 'Please grant camera permissions');
+            if (user) {
+                const { data: profile, error } = await supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', user.id)
+                    .single();
+
+                if (error) {
+                    console.error('Error fetching profile:', error);
                     return;
                 }
-                result = await ImagePicker.launchCameraAsync({
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: true,
-                    aspect: [4, 3],
-                    quality: 0.8,
-                });
-            } else {
-                const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                if (status !== 'granted') {
-                    Alert.alert('Permission needed', 'Please grant photo library permissions');
-                    return;
-                }
-                result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: true,
-                    aspect: [4, 3],
-                    quality: 0.8,
-                });
-            }
 
-            if (!result.canceled && result.assets[0].uri) {
-                setImages(prev => [...prev, result.assets[0].uri]);
+                setUserDetails({
+                    full_name: profile.full_name,
+                    email: user.email || ''
+                });
             }
         } catch (error) {
-            Alert.alert('Error', 'Failed to pick image');
-            console.error('Error picking image:', error);
+            console.error('Error in fetchUserDetails:', error);
+            Alert.alert('Error', 'Failed to fetch user details');
         }
     };
 
-    const uploadImages = async (): Promise<string[]> => {
+    const handleImagePick = async (source: 'camera' | 'library') => {
         try {
-            const uploadedUrls = await Promise.all(
-                images.map(async (uri, index) => {
-                    // For local files, we need to read them first
-                    const base64 = await fetch(uri).then(response => 
-                        response.blob()
-                    ).then(blob => {
-                            return new Promise((resolve, reject) => {
-                                const reader = new FileReader();
-                                reader.onload = () => {
-                                    resolve(reader.result);
-                                };
-                                reader.onerror = reject;
-                                reader.readAsDataURL(blob);
-                            });
-                        });
+            if (images.length >= 1) {
+                Alert.alert('Limit Reached', 'You can only upload up to 1 image');
+                return;
+            }
 
-                    // Remove the data URL prefix to get just the base64 string
-                    const base64String = base64.toString().split(',')[1];
-
-                    // Create file name
-                    const ext = uri.substring(uri.lastIndexOf('.') + 1);
-                    const fileName = `${Date.now()}-${index}.${ext}`;
-
-                    console.log('Uploading file:', fileName);
-
-                    const { data, error } = await supabase.storage
-                        .from('items-images')
-                        .upload(fileName, decode(base64String), {
-                            contentType: `image/${ext}`,
-                            cacheControl: '3600',
-                            upsert: false
-                        });
-
-                    if (error) {
-                        console.error('Upload error:', error);
-                        throw error;
-                    }
-
-                    // Get the public URL
-                    const { data: { publicUrl } } = supabase.storage
-                    .from('items-images')
-                    .getPublicUrl(data.path);
-
-                    return publicUrl;
-                })
-            );
-
-            return uploadedUrls;
+            const imageUri = await pickImage(source);
+            if (imageUri) {
+                setImages(prev => [...prev, imageUri]);
+            }
         } catch (error) {
-            console.error('Error in uploadImages:', error);
-            throw error;
+            console.error('Error handling image pick:', error);
+            Alert.alert('Error', 'Failed to pick image');
         }
-    };    const removeImage = (index: number) => {
+    };
+
+    const removeImage = (index: number) => {
         setImages(prev => prev.filter((_, i) => i !== index));
     };
 
@@ -180,7 +106,8 @@ export default function CreateFoundItem() {
             let imageUrls: string[] = [];
 
             if (images.length > 0) {
-                imageUrls = await uploadImages();
+                const uploadPromises = images.map(uri => uploadImage(uri));
+                imageUrls = await Promise.all(uploadPromises);
             }
 
             const { error } = await supabase
@@ -211,19 +138,6 @@ export default function CreateFoundItem() {
         }
     };
 
-{/*
-    const handleSignOut = async () => {
-        try {
-            const { error } = await supabase.auth.signOut();
-            if (error) throw error;
-            router.replace('/auth/sign-in');
-        } catch (error) {
-            Alert.alert('Error signing out', error.message);
-        }
-    };
-    */}
-
-
     const showImagePicker = () => {
         if (Platform.OS === 'ios') {
             ActionSheetIOS.showActionSheetWithOptions(
@@ -232,8 +146,8 @@ export default function CreateFoundItem() {
                     cancelButtonIndex: 0,
                 },
                 (buttonIndex) => {
-                    if (buttonIndex === 1) pickImage('camera');
-                        else if (buttonIndex === 2) pickImage('library');
+                    if (buttonIndex === 1) handleImagePick('camera');
+                    else if (buttonIndex === 2) handleImagePick('library');
                 }
             );
         } else {
@@ -242,8 +156,8 @@ export default function CreateFoundItem() {
                 'Choose a method',
                 [
                     { text: 'Cancel', style: 'cancel' },
-                    { text: 'Take Photo', onPress: () => pickImage('camera') },
-                    { text: 'Choose from Library', onPress: () => pickImage('library') }
+                    { text: 'Take Photo', onPress: () => handleImagePick('camera') },
+                    { text: 'Choose from Library', onPress: () => handleImagePick('library') }
                 ]
             );
         }
@@ -335,7 +249,7 @@ export default function CreateFoundItem() {
                             <Text className="text-gray-700 mb-2">Description</Text>
                             <TextInput
                                 className="bg-white p-3 rounded-lg border border-gray-200"
-                                placeholder="Describe where the owner could find this item (e.g. I handed it to office x in department y"
+                                placeholder="Describe where the owner could find this item (e.g. I handed it to office x in department y)"
                                 multiline
                                 numberOfLines={4}
                                 onChangeText={onChange}
@@ -348,7 +262,6 @@ export default function CreateFoundItem() {
                     )}
                 />
 
-                {/* Image Upload Section */}
                 <View className="mb-4">
                     <Text className="text-gray-700 mb-2">Images (max 1)</Text>
                     <View className="flex-row flex-wrap">
@@ -370,13 +283,6 @@ export default function CreateFoundItem() {
                             <TouchableOpacity
                                 className="w-20 h-20 bg-gray-100 rounded-lg items-center justify-center"
                                 onPress={showImagePicker}
-                                /*
-                                 * I once broke the profile page which was the only
-                                 * access point to the log out button, so I had to turn 
-                                 * another button into the log out button and this was
-                                 * my random selection. Will let it be for the future.
-                                 */
-                                // onPress={handleSignOut}
                             >
                                 <View className="items-center">
                                     <CameraIcon size={24} color={Colors.text.secondary} strokeWidth={2} />
@@ -395,10 +301,10 @@ export default function CreateFoundItem() {
                     {isSubmitting ? (
                         <ActivityIndicator color="white" />
                     ) : (
-                            <Text className="text-white text-center font-semibold text-lg">
-                                Report Found Item
-                            </Text>
-                        )}
+                        <Text className="text-white text-center font-semibold text-lg">
+                            Report Found Item
+                        </Text>
+                    )}
                 </TouchableOpacity>
             </View>
         </ScrollView>

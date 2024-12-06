@@ -15,12 +15,10 @@ import { useForm, Controller } from 'react-hook-form';
 import { router } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
 import { CameraIcon, XMarkIcon } from 'react-native-heroicons/outline';
-import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
 import { Categories } from '../../constants/Categories';
 import { Colors } from '../../constants/Colors';
 import { supabase } from '../../lib/supabase';
-import { decode } from 'base-64';
+import { pickImage, uploadImage } from '../../lib/imageHandler';
 
 interface LostItemForm {
     title: string;
@@ -29,158 +27,67 @@ interface LostItemForm {
     location: string;
 }
 
+interface UserDetails {
+    full_name: string | null;
+    email: string;
+}
+
 export default function CreateLostItem() {
     const [images, setImages] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [userDetails, setUserDetails] = useState<{
-        full_name: string | null;
-        email: string;
-    } | null>(null);
-    const { control, handleSubmit, formState: { errors } } = useForm<LostItemForm>();
+    const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
+    
+    const { 
+        control, 
+        handleSubmit, 
+        formState: { errors } 
+    } = useForm<LostItemForm>();
 
     useEffect(() => {
-        const fetchUserDetails = async () => {
-            try {
-                const { data: { user } } = await supabase.auth.getUser();
-
-                if (user) {
-                    const { data: profile, error } = await supabase
-                        .from('profiles')
-                        .select('full_name')
-                        .eq('id', user.id)
-                        .single();
-
-                    if (error) {
-                        console.error('Error fetching profile:', error);
-                        return;
-                    }
-
-                    setUserDetails({
-                        full_name: profile.full_name,
-                        email: user.email
-                    });
-                }
-            } catch (error) {
-                console.error('Error in fetchUserDetails:', error);
-            }
-        };
-
         fetchUserDetails();
     }, []);
 
+    const fetchUserDetails = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
 
-    const pickImage = async (source: 'camera' | 'library') => {
+            if (user) {
+                const { data: profile, error } = await supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', user.id)
+                    .single();
+
+                if (error) {
+                    console.error('Error fetching profile:', error);
+                    return;
+                }
+
+                setUserDetails({
+                    full_name: profile.full_name,
+                    email: user.email || ''
+                });
+            }
+        } catch (error) {
+            console.error('Error in fetchUserDetails:', error);
+            Alert.alert('Error', 'Failed to fetch user details');
+        }
+    };
+
+    const handleImagePick = async (source: 'camera' | 'library') => {
         try {
             if (images.length >= 1) {
                 Alert.alert('Limit Reached', 'You can only upload up to 1 image');
                 return;
             }
 
-            let result;
-            const options = {
-                mediaTypes: ImagePicker.MediaType.Images,  // Updated from MediaTypeOptions
-                allowsEditing: true,
-                aspect: [4, 3],
-                quality: 0.8,
-            };
-
-            if (source === 'camera') {
-                const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                if (status !== 'granted') {
-                    Alert.alert('Permission needed', 'Please grant camera permissions');
-                    return;
-                }
-                result = await ImagePicker.launchCameraAsync(options);
-            } else {
-                const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                if (status !== 'granted') {
-                    Alert.alert('Permission needed', 'Please grant photo library permissions');
-                    return;
-                }
-                result = await ImagePicker.launchImageLibraryAsync(options);
-            }
-
-            if (!result.canceled && result.assets[0].uri) {
-                const selectedImage = result.assets[0];
-                console.log('Picked image details:', {
-                    uri: selectedImage.uri,
-                    width: selectedImage.width,
-                    height: selectedImage.height,
-                    type: selectedImage.type,
-                    fileSize: selectedImage.fileSize
-                });
-
-                // Check file info immediately
-                const fileInfo = await FileSystem.getInfoAsync(selectedImage.uri);
-                console.log('FileSystem info for picked image:', fileInfo);
-
-                setImages(prev => [...prev, selectedImage.uri]);
+            const imageUri = await pickImage(source);
+            if (imageUri) {
+                setImages(prev => [...prev, imageUri]);
             }
         } catch (error) {
-            console.error('Error picking image:', error);
+            console.error('Error handling image pick:', error);
             Alert.alert('Error', 'Failed to pick image');
-        }
-    };
-
-    const uploadImages = async (): Promise<string[]> => {
-        try {
-            const uploadedUrls = await Promise.all(
-                images.map(async (uri) => {
-                    console.log('Starting upload for uri:', uri);
-
-                    // Get and log file info
-                    const fileInfo = await FileSystem.getInfoAsync(uri);
-                    console.log('File info before upload:', fileInfo);
-
-                    if (!fileInfo.exists) {
-                        throw new Error('File does not exist');
-                    }
-
-                    // Try reading the file directly first
-                    try {
-                        const rawFile = await FileSystem.readAsStringAsync(uri);
-                        console.log('Raw file length:', rawFile.length);
-                    } catch (readError) {
-                        console.error('Error reading raw file:', readError);
-                    }
-
-                    // Read as base64
-                    const base64 = await FileSystem.readAsStringAsync(uri, {
-                        encoding: FileSystem.EncodingType.Base64
-                    });
-                    console.log('Base64 string length:', base64.length);
-
-                    // Create the filename
-                    const fileName = `uploads/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
-
-                    // Try uploading the base64 string directly
-                    const { data, error } = await supabase.storage
-                        .from('items-images')
-                        .upload(fileName, base64, {
-                            contentType: 'image/jpeg',
-                            upsert: false
-                        });
-
-                    if (error) {
-                        console.error('Supabase upload error:', error);
-                        throw error;
-                    }
-
-                    console.log('Upload response:', data);
-
-                    const { data: { publicUrl } } = supabase.storage
-                    .from('items-images')
-                    .getPublicUrl(fileName);
-
-                    console.log('Generated public URL:', publicUrl);
-                    return publicUrl;
-                })
-            );
-
-            return uploadedUrls;
-        } catch (error) {
-            console.error('Fatal error in uploadImages:', error);
-            throw error;
         }
     };
 
@@ -196,24 +103,13 @@ export default function CreateLostItem() {
 
         try {
             setIsSubmitting(true);
-            console.log('Starting submission process');
-
             let imageUrls: string[] = [];
 
             if (images.length > 0) {
-                console.log('Starting image upload process');
-                try {
-                    imageUrls = await uploadImages();
-                    console.log('Image upload completed:', imageUrls);
-                } catch (uploadError) {
-                    console.error('Image upload failed:', uploadError);
-                    Alert.alert('Error', 'Failed to upload images. Please try again.');
-                    setIsSubmitting(false);
-                    return;
-                }
+                const uploadPromises = images.map(uri => uploadImage(uri));
+                imageUrls = await Promise.all(uploadPromises);
             }
 
-            console.log('Proceeding with item creation');
             const { error } = await supabase
                 .from('items')
                 .insert([{
@@ -227,10 +123,7 @@ export default function CreateLostItem() {
                     deleted: false
                 }]);
 
-            if (error) {
-                console.error('Item creation error:', error);
-                throw error;
-            }
+            if (error) throw error;
 
             Alert.alert(
                 'Success',
@@ -244,6 +137,7 @@ export default function CreateLostItem() {
             setIsSubmitting(false);
         }
     };
+
     const showImagePicker = () => {
         if (Platform.OS === 'ios') {
             ActionSheetIOS.showActionSheetWithOptions(
@@ -252,8 +146,8 @@ export default function CreateLostItem() {
                     cancelButtonIndex: 0,
                 },
                 (buttonIndex) => {
-                    if (buttonIndex === 1) pickImage('camera');
-                        else if (buttonIndex === 2) pickImage('library');
+                    if (buttonIndex === 1) handleImagePick('camera');
+                    else if (buttonIndex === 2) handleImagePick('library');
                 }
             );
         } else {
@@ -262,8 +156,8 @@ export default function CreateLostItem() {
                 'Choose a method',
                 [
                     { text: 'Cancel', style: 'cancel' },
-                    { text: 'Take Photo', onPress: () => pickImage('camera') },
-                    { text: 'Choose from Library', onPress: () => pickImage('library') }
+                    { text: 'Take Photo', onPress: () => handleImagePick('camera') },
+                    { text: 'Choose from Library', onPress: () => handleImagePick('library') }
                 ]
             );
         }
@@ -355,7 +249,7 @@ export default function CreateLostItem() {
                             <Text className="text-gray-700 mb-2">Description</Text>
                             <TextInput
                                 className="bg-white p-3 rounded-lg border border-gray-200"
-                                placeholder="Describe where the owner could find this item (e.g. I handed it to office x in department y"
+                                placeholder="Describe the item and any identifying features"
                                 multiline
                                 numberOfLines={4}
                                 onChangeText={onChange}
@@ -368,7 +262,6 @@ export default function CreateLostItem() {
                     )}
                 />
 
-                {/* img upload */}
                 <View className="mb-4">
                     <Text className="text-gray-700 mb-2">Images (max 1)</Text>
                     <View className="flex-row flex-wrap">
@@ -408,10 +301,10 @@ export default function CreateLostItem() {
                     {isSubmitting ? (
                         <ActivityIndicator color="white" />
                     ) : (
-                            <Text className="text-white text-center font-semibold text-lg">
-                                Report Lost Item
-                            </Text>
-                        )}
+                        <Text className="text-white text-center font-semibold text-lg">
+                            Report Lost Item
+                        </Text>
+                    )}
                 </TouchableOpacity>
             </View>
         </ScrollView>
