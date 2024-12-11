@@ -48,7 +48,7 @@ export default function ItemCard({ item, refreshItems }: ItemCardProps) {
                             if (refreshItems) {
                                 refreshItems();
                             } else {
-                                // If we're not given a refresh function, navigate back
+                                // this thing ruined eberything
                                 // router.back();
                             }
                         } catch (error) {
